@@ -24,13 +24,13 @@ def setup_brevo_configuration(api_key_file):
     return configuration
 
 
-def add_contacts_to_brevo(api_key_file, contact_data):
+def add_contacts_to_brevo(api_key_file, contact_data, contact_list_id):
     configuration = setup_brevo_configuration(api_key_file)
     api_instance = sib_api_v3_sdk.ContactsApi(sib_api_v3_sdk.ApiClient(configuration))
 
     request_contact_import = sib_api_v3_sdk.RequestContactImport()
     request_contact_import.json_body = contact_data
-    request_contact_import.list_ids = [10]  # 'Contacts' list ID = 8
+    request_contact_import.list_ids = [contact_list_id]
     request_contact_import.email_blacklist = False
     request_contact_import.sms_blacklist = False
     request_contact_import.update_existing_contacts = True
@@ -39,7 +39,7 @@ def add_contacts_to_brevo(api_key_file, contact_data):
     try:
         api_response = api_instance.import_contacts(request_contact_import)
 
-        logging.debug(json.dumps(api_response, indent=4))
+        logging.debug(api_response, indent=4)
 
     except ApiException as err:
         print(err)
@@ -130,11 +130,32 @@ def get_contacts_from_google_sheets(
 def parse_args(argv):
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--sheet-name', default='Contacts', help='')
-    parser.add_argument('--sheet-start-column', default='A', help='')
-    parser.add_argument('--sheet-end-column', default='L', help='')
-    parser.add_argument('--google-spreadsheet-id', default='1cUJgnziGuh8-2EiCTikdZ3UeOV7s6claB4peIJGE2MI', help='')
-    parser.add_argument('--brevo-list-id', type=int, default=8, help='')
+    parser.add_argument(
+        '--sheet-name',
+        default='Contacts',
+        help='The name of the sheet to retrieve data from within the Google Sheets file'
+    )
+    parser.add_argument(
+        '--sheet-start-column',
+        default='A',
+        help='The first column in the range of columns to retrieve data from'
+    )
+    parser.add_argument(
+        '--sheet-end-column',
+        default='L',
+        help='The last column in the range of columns to retrieve data from'
+    )
+    parser.add_argument(
+        '--google-spreadsheet-id',
+        default='1cUJgnziGuh8-2EiCTikdZ3UeOV7s6claB4peIJGE2MI',
+        help='ID of the Google Sheets file containing the contact information'
+    )
+    parser.add_argument(
+        '--brevo-list-id',
+        type=int,
+        default=10,
+        help='ID of the Brevo Contact List to update'
+    )
     parser.add_argument(
         '--brevo-api-key-file',
         default='brevo_api_key.txt',
@@ -171,10 +192,8 @@ def main():
         args.sheet_end_column,
     )
     brevo_compatible_contact_data = convert_contacts_to_brevo_api_format(google_contact_data)
-    add_contacts_to_brevo(args.brevo_api_key_file, brevo_compatible_contact_data)
+    add_contacts_to_brevo(args.brevo_api_key_file, brevo_compatible_contact_data, args.brevo_list_id)
 
 
 if __name__ == '__main__':
     main()
-
-# FYI https://developers.google.com/sheets/api/quickstart/python

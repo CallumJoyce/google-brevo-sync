@@ -1,4 +1,4 @@
-/env/
-credentials.json
-token.json
+env/
+google_api_credentials.json
+google_api_token.json
 brevo_api_key.txt
