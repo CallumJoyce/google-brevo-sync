@@ -1,6 +1,8 @@
+import argparse
 import json
 import logging
 import os
+import sys
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -11,9 +13,9 @@ import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
 
 
-def setup_brevo_configuration():
+def setup_brevo_configuration(api_key_file):
 
-    with open('brevo_api_key.txt') as fp:
+    with open(api_key_file) as fp:
         api_key = fp.read()
 
     configuration = sib_api_v3_sdk.Configuration()
@@ -22,8 +24,8 @@ def setup_brevo_configuration():
     return configuration
 
 
-def add_contacts_to_brevo(contact_data):
-    configuration = setup_brevo_configuration()
+def add_contacts_to_brevo(api_key_file, contact_data):
+    configuration = setup_brevo_configuration(api_key_file)
     api_instance = sib_api_v3_sdk.ContactsApi(sib_api_v3_sdk.ApiClient(configuration))
 
     request_contact_import = sib_api_v3_sdk.RequestContactImport()
@@ -59,28 +61,28 @@ def convert_contacts_to_brevo_api_format(google_contact_data):
     return brevo_api_data
 
 
-def setup_google_auth():
+def setup_google_auth(api_credentials_file, api_token_file):
     creds = None
     scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 
-    if os.path.exists('token.json'):  # TODO Don't assume relative file path is reliable
-        creds = Credentials.from_authorized_user_file('token.json', scopes)
+    if os.path.exists(api_token_file):
+        creds = Credentials.from_authorized_user_file(api_token_file, scopes)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', scopes)
+            flow = InstalledAppFlow.from_client_secrets_file(api_credentials_file, scopes)
             creds = flow.run_local_server(port=0)
 
-        with open('token.json', 'w') as token:
+        with open(api_token_file, 'w') as token:
             token.write(creds.to_json())
 
     return creds
 
 
-def get_contacts_from_google_sheets():
-    creds = setup_google_auth()
+def get_contacts_from_google_sheets(api_credentials_file, api_token_file):
+    creds = setup_google_auth(api_credentials_file, api_token_file)
 
     try:
         contact_spreadsheet_id = '1cUJgnziGuh8-2EiCTikdZ3UeOV7s6claB4peIJGE2MI'  # Taken from URL
@@ -115,16 +117,33 @@ def get_contacts_from_google_sheets():
     return rows
 
 
+def parse_args(argv):
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--brevo-api-key-file', help='Path to text file containing a Brevo API key')
+    parser.add_argument('--google-api-credentials-file', help='Path to JSON file containing Google API credentials')
+    parser.add_argument(
+        '--google-api-token-file', 
+        help='Path to JSON file containing Google API token, if this does not exist it will be created'
+    )
+
+    return parser.parse_args()
+
+
 def main():
     log_level = os.environ.get('LOGLEVEL')
 
     if log_level is not None:
-        # TODO Tidy up log handling
         logging.basicConfig(level=log_level)
 
-    google_contact_data = get_contacts_from_google_sheets()
+    args = parse_args(sys.argv[1:])
+
+    google_contact_data = get_contacts_from_google_sheets(
+        args.google_api_credentials_file, 
+        args.google_api_token_file
+    )
     brevo_compatible_contact_data = convert_contacts_to_brevo_api_format(google_contact_data)
-    add_contacts_to_brevo(brevo_compatible_contact_data)
+    add_contacts_to_brevo(args.brevo_api_key_file, brevo_compatible_contact_data)
 
 
 if __name__ == '__main__':
