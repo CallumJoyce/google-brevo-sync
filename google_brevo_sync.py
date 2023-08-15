@@ -87,11 +87,17 @@ def setup_google_auth(api_credentials_file, api_token_file):
     return creds
 
 
-def get_contacts_from_google_sheets(api_credentials_file, api_token_file):
+def get_contacts_from_google_sheets(
+    api_credentials_file,
+    api_token_file,
+    google_spreadsheet_id,
+    sheet_name,
+    start_column,
+    end_column
+):
     creds = setup_google_auth(api_credentials_file, api_token_file)
 
     try:
-        contact_spreadsheet_id = '1cUJgnziGuh8-2EiCTikdZ3UeOV7s6claB4peIJGE2MI'  # Taken from URL
         client = build('sheets', 'v4', credentials=creds)
 
         sheet = client.spreadsheets()
@@ -99,9 +105,10 @@ def get_contacts_from_google_sheets(api_credentials_file, api_token_file):
         offset = 0
 
         while True:
+            range_string = f'{sheet_name}!{start_column}{offset + 1}:{end_column}{offset + 100}'
             result = sheet \
                 .values() \
-                .get(spreadsheetId=contact_spreadsheet_id, range=f'Contacts!A{offset + 1}:L{offset + 100}') \
+                .get(spreadsheetId=google_spreadsheet_id, range=range_string) \
                 .execute()
             values = result.get('values', [])
 
@@ -123,11 +130,25 @@ def get_contacts_from_google_sheets(api_credentials_file, api_token_file):
 def parse_args(argv):
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--brevo-api-key-file', help='Path to text file containing a Brevo API key')
-    parser.add_argument('--google-api-credentials-file', help='Path to JSON file containing Google API credentials')
+    parser.add_argument('--sheet-name', default='Contacts', help='')
+    parser.add_argument('--sheet-start-column', default='A', help='')
+    parser.add_argument('--sheet-end-column', default='L', help='')
+    parser.add_argument('--google-spreadsheet-id', default='1cUJgnziGuh8-2EiCTikdZ3UeOV7s6claB4peIJGE2MI', help='')
+    parser.add_argument('--brevo-list-id', type=int, default=8, help='')
     parser.add_argument(
-        '--google-api-token-file', 
-        help='Path to JSON file containing Google API token, if this does not exist it will be created'
+        '--brevo-api-key-file',
+        default='brevo_api_key.txt',
+        help='Path to text file containing a Brevo API key'
+    )
+    parser.add_argument(
+        '--google-api-credentials-file',
+        default='google_api_credentials.json',
+        help='Path to JSON file containing Google API credentials'
+    )
+    parser.add_argument(
+        '--google-api-token-file',
+        default='google_api_token.json',
+        help='Path to JSON file containing a Google API token, if this does not exist it will be created'
     )
 
     return parser.parse_args()
@@ -142,8 +163,12 @@ def main():
     args = parse_args(sys.argv[1:])
 
     google_contact_data = get_contacts_from_google_sheets(
-        args.google_api_credentials_file, 
-        args.google_api_token_file
+        args.google_api_credentials_file,
+        args.google_api_token_file,
+        args.google_spreadsheet_id,
+        args.sheet_name,
+        args.sheet_start_column,
+        args.sheet_end_column,
     )
     brevo_compatible_contact_data = convert_contacts_to_brevo_api_format(google_contact_data)
     add_contacts_to_brevo(args.brevo_api_key_file, brevo_compatible_contact_data)
