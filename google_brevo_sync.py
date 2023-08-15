@@ -48,12 +48,18 @@ def add_contacts_to_brevo(api_key_file, contact_data):
 def convert_contacts_to_brevo_api_format(google_contact_data):
     brevo_api_data = []
 
-    for row in google_contact_data:
+    headers = google_contact_data[0]
+    firstname_index = headers.index('First name')
+    lastname_index = headers.index('Last name')
+    email_index = headers.index('Email address')
+    sms_index = headers.index('Contact number')
+
+    for row in google_contact_data[1:]:
         brevo_api_data.append({
-            'FIRSTNAME': row[1],
-            'LASTNAME': row[2],
-            'SMS': row[4],  # Conversion from '07XXX XXXXX' to 447XXXXXXXX is handled by the API
-            'EMAIL': row[6],
+            'FIRSTNAME': row[firstname_index],
+            'LASTNAME': row[lastname_index],
+            'SMS': row[sms_index],  # Conversion from '07XXX XXXXX' to 447XXXXXXXX is handled by the API
+            'EMAIL': row[email_index],
         })
 
     logging.debug(json.dumps(brevo_api_data, indent=4))
@@ -105,9 +111,6 @@ def get_contacts_from_google_sheets(api_credentials_file, api_token_file):
                 break
 
             offset += 100
-
-        # TODO Handle headers properly
-        rows = rows[1:]
 
         logging.debug(json.dumps(rows, indent=4))
 
